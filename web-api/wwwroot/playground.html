@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVC VTuber Chat - Executive Live Playground</title>
+    <style>
+        :root {
+            --bg-base: #0c0d12;
+            --bg-panel: #161722;
+            --bg-sub: #1e1f2e;
+            --border-panel: #2a2c3f;
+            --border-active: #3f4260;
+            --text-main: #f0f2ff;
+            --text-muted: #8e92a8;
+            --host-gold: #ffb74d;
+            --host-glow: rgba(255, 183, 77, 0.25);
+            --fan-cyan: #00e5ff;
+            --fan-glow: rgba(0, 229, 255, 0.25);
+            --accent-green: #00e676;
+            --accent-red: #ff5252;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            --font-mono: "Consolas", "Courier New", monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            padding: 10px;
+            gap: 8px;
+        }
+
+        /* 頂部 Executive 標題欄 */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 8px;
+            padding: 8px 16px;
+        }
+        .brand-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            letter-spacing: 0.5px;
+        }
+        .brand-badge {
+            background: linear-gradient(135deg, #ff8f00, #ffb74d);
+            color: #000;
+            font-size: 0.72rem;
+            font-weight: 900;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .header-metrics {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 0.8rem;
+        }
+        .metric-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-sub);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-panel);
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        /* 主舞台：左右雙開 ＋ 中島導播 */
+        .stage-container {
+            display: flex;
+            gap: 10px;
+            flex: 1;
+            min-height: 0;
+        }
+
+        /* 主播與觀眾面板 */
+        .client-card {
+            flex: 1;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            min-width: 0;
+            position: relative;
+        }
+        .client-card.host-theme { border-top: 3px solid var(--host-gold); }
+        .client-card.fan-theme { border-top: 3px solid var(--fan-cyan); }
+
+        .client-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border-panel);
+        }
+        .client-identity {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+        .client-identity.host-color { color: var(--host-gold); }
+        .client-identity.fan-color { color: var(--fan-cyan); }
+        .client-substatus {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* 聊天氣泡視窗 */
+        .chat-stream {
+            flex: 1;
+            background: #0f1017;
+            border: 1px solid var(--border-panel);
+            border-radius: 6px;
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .bubble {
+            max-width: 85%;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            line-height: 1.45;
+            word-break: break-word;
+            animation: fadeIn 0.2s ease-out;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+        .bubble-host {
+            background: #2b1f14;
+            border: 1px solid rgba(255, 183, 77, 0.4);
+            box-shadow: 0 2px 10px var(--host-glow);
+        }
+        .bubble-fan {
+            background: #13242c;
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            box-shadow: 0 2px 10px var(--fan-glow);
+        }
+        .bubble-system {
+            align-self: center;
+            background: rgba(255, 255, 255, 0.05);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            border: 1px dashed var(--border-panel);
+            padding: 4px 10px;
+        }
+        .bubble-alert {
+            align-self: center;
+            background: rgba(255, 82, 82, 0.15);
+            color: var(--accent-red);
+            font-size: 0.75rem;
+            border: 1px solid var(--accent-red);
+            padding: 6px 12px;
+            font-weight: 600;
+        }
+
+        .sender-tag {
+            font-size: 0.72rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sender-host { color: var(--host-gold); }
+        .sender-fan { color: var(--fan-cyan); }
+
+        /* 輸入控制列 */
+        .chat-input-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .chat-input-row input {
+            flex: 1;
+            background: #0f1017;
+            border: 1px solid var(--border-panel);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .host-theme .chat-input-row input:focus { border-color: var(--host-gold); box-shadow: 0 0 8px var(--host-glow); }
+        .fan-theme .chat-input-row input:focus { border-color: var(--fan-cyan); box-shadow: 0 0 8px var(--fan-glow); }
+
+        .btn-action {
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-host { background: var(--host-gold); color: #000; }
+        .btn-host:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-host:active { background: #e65100; color: #fff; transform: translateY(1px); }
+
+        .btn-fan { background: var(--fan-cyan); color: #000; }
+        .btn-fan:hover { opacity: 0.9; transform: translateY(-1px); }
+        .btn-fan:active { background: #0097a7; color: #fff; transform: translateY(1px); }
+
+        .btn-spam { background: #37474f; color: #ff8a80; font-size: 0.75rem; padding: 6px 10px; }
+        .btn-spam:hover { background: #455a64; color: #ff5252; }
+
+        /* 中島導播區 (Director Island) */
+        .island-card {
+            width: 280px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            gap: 8px;
+            align-items: center;
+        }
+        .island-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+        .qr-box {
+            background: #fff;
+            padding: 8px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .qr-box canvas { width: 140px; height: 140px; }
+        .qr-caption {
+            font-size: 0.7rem;
+            color: #333;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .tunnel-url-badge {
+            font-size: 0.7rem;
+            color: var(--fan-cyan);
+            word-break: break-all;
+            text-align: center;
+            background: var(--bg-sub);
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-panel);
+            max-width: 100%;
+        }
+
+        .island-metrics {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            background: var(--bg-sub);
+            padding: 5px 8px;
+            border-radius: 4px;
+        }
+        .metric-label { color: var(--text-muted); }
+        .metric-value { font-weight: 700; color: var(--accent-green); }
+
+        .island-controls {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: auto;
+        }
+        .btn-control {
+            background: #252839;
+            color: #fff;
+            border: 1px solid var(--border-panel);
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-control:hover { background: #32364e; }
+        .btn-control.active { background: #304ffe; border-color: #536dfe; }
+
+        /* 下方 Cyber Terminal HUD (即時 Docker Compose Log 串流) */
+        .terminal-hud {
+            height: 260px;
+            background: #08080c;
+            border: 1px solid var(--border-panel);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #101118;
+            padding: 4px 12px;
+            border-bottom: 1px solid #1a1c28;
+            font-size: 0.75rem;
+        }
+        .terminal-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            color: #a5d6a7;
+            font-weight: 700;
+        }
+        .terminal-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .terminal-btn {
+            background: transparent;
+            border: 1px solid #2a2d3e;
+            color: var(--text-muted);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            cursor: pointer;
+        }
+        .terminal-btn:hover { color: #fff; border-color: #555; }
+
+        .terminal-body {
+            flex: 1;
+            padding: 8px 12px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.74rem;
+            line-height: 1.45;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-entry { margin-bottom: 2px; }
+        .log-tag-ws { color: #00e5ff; font-weight: bold; }
+        .log-tag-match { color: #00e676; font-weight: bold; }
+        .log-tag-recv { color: #ffb74d; font-weight: bold; }
+        .log-tag-rate { color: #ff5252; font-weight: bold; }
+        .log-tag-tunnel { color: #d1c4e9; background: rgba(149, 117, 205, 0.25); padding: 1px 4px; border-radius: 3px; font-weight: bold; }
+        .log-tag-sys { color: #8c8c9e; }
+        .log-time { color: #5c5f78; margin-right: 4px; }
+    </style>
+    <!-- 輕量免外聯純前端 QR Code 生成庫 -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+
+    <!-- 頂部商用指標 Header -->
+    <header>
+        <div class="brand-title">
+            <span>UVC VTuber Live Studio</span>
+            <span class="brand-badge">EXECUTIVE DEMO</span>
+        </div>
+        <div class="header-metrics">
+            <div class="metric-pill">
+                <div class="pulse-dot"></div>
+                <span>Nginx Gateway :8080</span>
+            </div>
+            <div class="metric-pill">
+                <span>Memory Heap: <strong>1.75 MB</strong> (Cost -90%)</span>
+            </div>
+            <div class="metric-pill">
+                <span>Active Stack: <strong>.NET 8 Kestrel</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主展示舞台 (三合一導播畫布) -->
+    <div class="stage-container">
+        <!-- 視角 1：主播端 (👑 一瞬晨星) -->
+        <div class="client-card host-theme">
+            <div class="client-header">
+                <div class="client-identity host-color">
+                    <span>👑 一瞬晨星 (Host / VIP)</span>
+                </div>
+                <div class="client-substatus" id="host-status">WebSocket: 連線中...</div>
+            </div>
+            <div class="chat-stream" id="host-chat-box">
+                <div class="bubble bubble-system">[系統] 正在連接 Nginx 反向代理 ws://localhost:8080/ws...</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="host-input" placeholder="以主播身分輸入訊息 (回車送出)..." value="各位DD晚上好！歡迎來到直播間～">
+                <button class="btn-action btn-host" id="host-send-btn">發送 (Send)</button>
+            </div>
+        </div>
+
+        <!-- 中央：中島導播與手機 QR Code 穿透區 -->
+        <div class="island-card">
+            <div class="island-title">Mobile Live Access</div>
+            
+            <div class="qr-box" id="qr-container" title="點擊在新分頁開啟手機觀眾端">
+                <canvas id="qr-canvas"></canvas>
+                <div class="qr-caption">📱 手機掃碼秒連對打</div>
+            </div>
+            <div class="tunnel-url-badge" id="tunnel-url-text">載入中...</div>
+
+            <div class="island-metrics">
+                <div class="metric-row">
+                    <span class="metric-label">即時網路往返 RTT:</span>
+                    <span class="metric-value" id="hud-rtt">16.17 ms</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">撮合配對房間:</span>
+                    <span class="metric-value" id="hud-room">room_c770ed94</span>
+                </div>
+                <div class="metric-row">
+                    <span class="metric-label">防刷閥冷卻閾值:</span>
+                    <span class="metric-value">700 ms</span>
+                </div>
+            </div>
+
+            <div class="island-controls">
+                <button class="btn-control" id="btn-reconnect-all">🔄 重新初始化雙端撮合</button>
+                <button class="btn-control" id="btn-auto-tour">▶️ 自動導覽演練 (Auto-Tour)</button>
+            </div>
+        </div>
+
+        <!-- 視角 2：觀眾端 (💬 DD死忠粉) -->
+        <div class="client-card fan-theme">
+            <div class="client-header">
+                <div class="client-identity fan-color">
+                    <span>💬 DD死忠粉 (Audience / 觀眾端)</span>
+                </div>
+                <div class="client-substatus" id="fan-status">WebSocket: 連線中...</div>
+            </div>
+            <div class="chat-stream" id="fan-chat-box">
+                <div class="bubble bubble-system">[系統] 正在連接 Nginx 反向代理 ws://localhost:8080/ws...</div>
+            </div>
+            <div class="chat-input-row">
+                <input type="text" id="fan-input" placeholder="以觀眾身分輸入應援彈幕..." value="晨星單推人報到！！今天也超美！">
+                <button class="btn-action btn-fan" id="fan-send-btn">發送 (Send)</button>
+                <button class="btn-action btn-spam" id="fan-spam-btn" title="連續發送兩則測試 700ms 頻率限制">防刷測試</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 視角 3：下方 Cyber Terminal HUD (即時 Docker Compose stdout 日誌) -->
+    <div class="terminal-hud">
+        <div class="terminal-header">
+            <div class="terminal-title">
+                <span>● DOCKER COMPOSE STREAM TERMINAL</span>
+                <span style="color:#666;">(Live stdout / SSE :8080/api/logs/stream)</span>
+            </div>
+            <div class="terminal-actions">
+                <button class="terminal-btn" id="btn-toggle-scroll">自動滾動: 開啟</button>
+                <button class="terminal-btn" id="btn-clear-term">清空</button>
+            </div>
+        </div>
+        <div class="terminal-body" id="term-body"></div>
+    </div>
+
+    <!-- 即時雙端通訊、日誌串流與 QR Code 核心邏輯 -->
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+
+        let hostWs = null;
+        let fanWs = null;
+        let autoScroll = true;
+
+        // 1. 初始化 SSE 日誌即時串流
+        const termBody = document.getElementById('term-body');
+        function initLogStream() {
+            const evtSource = new EventSource('/api/logs/stream');
+            
+            evtSource.onmessage = (e) => {
+                appendTerminalLine(e.data);
+            };
+
+            evtSource.onerror = () => {
+                appendTerminalLine("[SYSTEM] SSE Log Stream disconnected, retrying...");
+            };
+        }
+
+        function appendTerminalLine(text) {
+            const line = document.createElement('div');
+            line.className = 'log-entry';
+
+            // 格式化語法高亮
+            let coloredText = text;
+            if (coloredText.includes('[WS][CONNECT]')) {
+                coloredText = coloredText.replace(/(\[WS\]\[CONNECT\])/g, '<span class="log-tag-ws">$1</span>');
+            } else if (coloredText.includes('[MATCH]')) {
+                coloredText = coloredText.replace(/(\[MATCH\](?:\[PAIR\]|\[JOIN\]|\[QUEUE\])?)/g, '<span class="log-tag-match">$1</span>');
+            } else if (coloredText.includes('[WS][RECV]')) {
+                coloredText = coloredText.replace(/(\[WS\]\[RECV\])/g, '<span class="log-tag-recv">$1</span>');
+            } else if (coloredText.includes('[RATE_LIMIT]')) {
+                coloredText = coloredText.replace(/(\[RATE_LIMIT\])/g, '<span class="log-tag-rate">$1</span>');
+            } else if (coloredText.includes('[TUNNEL]')) {
+                coloredText = coloredText.replace(/(\[TUNNEL\][^\n]+)/g, '<span class="log-tag-tunnel">$1</span>');
+            } else {
+                coloredText = `<span class="log-tag-sys">${coloredText}</span>`;
+            }
+
+            line.innerHTML = coloredText;
+            termBody.appendChild(line);
+
+            if (autoScroll) {
+                termBody.scrollTop = termBody.scrollHeight;
+            }
+        }
+
+        // 2. 初始化主播端 WebSocket
+        function connectHost() {
+            hostWs = new WebSocket(wsUrl);
+            hostWs.onopen = () => {
+                document.getElementById('host-status').innerText = '狀態: [LIVE Connected]';
+                document.getElementById('host-status').style.color = 'var(--accent-green)';
+                // 自動發起撮合
+                sendPacket(hostWs, 'join_match', '一瞬晨星', 'host', 'Host_Fan');
+            };
+            hostWs.onmessage = (e) => {
+                const pkt = JSON.parse(e.data);
+                handleMessage('host', pkt);
+            };
+            hostWs.onclose = () => {
+                document.getElementById('host-status').innerText = '狀態: [斷線]';
+                document.getElementById('host-status').style.color = 'var(--accent-red)';
+            };
+        }
+
+        // 3. 初始化觀眾端 WebSocket
+        function connectFan() {
+            fanWs = new WebSocket(wsUrl);
+            fanWs.onopen = () => {
+                document.getElementById('fan-status').innerText = '狀態: [LIVE Connected]';
+                document.getElementById('fan-status').style.color = 'var(--accent-green)';
+                sendPacket(fanWs, 'join_match', 'DD死忠粉', 'audience', 'Host_Fan');
+            };
+            fanWs.onmessage = (e) => {
+                const pkt = JSON.parse(e.data);
+                handleMessage('fan', pkt);
+            };
+            fanWs.onclose = () => {
+                document.getElementById('fan-status').innerText = '狀態: [斷線]';
+                document.getElementById('fan-status').style.color = 'var(--accent-red)';
+            };
+        }
+
+        function sendPacket(ws, action, sender, role, data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const pkt = { action, sender, role, data };
+                ws.send(JSON.stringify(pkt));
+            }
+        }
+
+        function handleMessage(clientSide, pkt) {
+            const chatBox = clientSide === 'host' ? document.getElementById('host-chat-box') : document.getElementById('fan-chat-box');
+            
+            if (pkt.action === 'match_found') {
+                const data = JSON.parse(pkt.data);
+                document.getElementById('hud-room').innerText = data.roomId;
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble bubble-system';
+                bubble.innerText = `[系統] 撮合成功！進入房間: ${data.roomId} (對手: ${data.opponent})`;
+                chatBox.appendChild(bubble);
+            }
+            else if (pkt.action === 'broadcast_msg') {
+                const bubble = document.createElement('div');
+                const isHost = pkt.role === 'host';
+                bubble.className = `bubble ${isHost ? 'bubble-host' : 'bubble-fan'}`;
+                
+                const senderHtml = `<div class="sender-tag ${isHost ? 'sender-host' : 'sender-fan'}">${isHost ? '👑 ' : '💬 '}${pkt.sender} ${isHost ? '(VIP)' : ''}</div>`;
+                bubble.innerHTML = `${senderHtml}<div>${pkt.data}</div>`;
+                chatBox.appendChild(bubble);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+            else if (pkt.action === 'rate_limited') {
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble bubble-alert';
+                bubble.innerText = `[頻率限制] ${pkt.data}`;
+                chatBox.appendChild(bubble);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        // 4. 發送事件監聽
+        document.getElementById('host-send-btn').addEventListener('click', () => {
+            const input = document.getElementById('host-input');
+            if (input.value.trim()) {
+                sendPacket(hostWs, 'send_msg', '一瞬晨星', 'host', input.value.trim());
+                input.value = '';
+            }
+        });
+        document.getElementById('host-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('host-send-btn').click();
+        });
+
+        document.getElementById('fan-send-btn').addEventListener('click', () => {
+            const input = document.getElementById('fan-input');
+            if (input.value.trim()) {
+                sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', input.value.trim());
+                input.value = '';
+            }
+        });
+        document.getElementById('fan-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('fan-send-btn').click();
+        });
+
+        document.getElementById('fan-spam-btn').addEventListener('click', () => {
+            sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', '連發第1則訊息');
+            setTimeout(() => {
+                sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', '連發第2則訊息(觸發冷卻)');
+            }, 80);
+        });
+
+        // 5. QR Code 生成與手機端連結 (支援 Cloudflare 公網動態同步)
+        let activeMobileUrl = `${window.location.protocol}//${window.location.host}/mobile.html`;
+
+        async function updateMobileQr() {
+            try {
+                const res = await fetch('/api/tunnel/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
+                        activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+                    }
+                }
+            } catch (e) {
+                console.warn('Cannot fetch tunnel config, fallback to local origin', e);
+            }
+
+            const isCloudflare = activeMobileUrl.includes('trycloudflare.com');
+            const badgeEl = document.getElementById('tunnel-url-text');
+            badgeEl.innerText = activeMobileUrl;
+            if (isCloudflare) {
+                badgeEl.style.color = '#81c784';
+                badgeEl.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+                badgeEl.title = 'Cloudflare Quick Tunnel (全球 SSL 綠鎖頭公網)';
+            }
+            
+            const qrCanvas = document.getElementById('qr-canvas');
+            if (window.QRCode) {
+                QRCode.toCanvas(qrCanvas, activeMobileUrl, { width: 130, margin: 1 }, (err) => {
+                    if (err) console.error(err);
+                });
+            }
+        }
+
+        document.getElementById('qr-container').addEventListener('click', () => {
+            window.open(activeMobileUrl, '_blank');
+        });
+
+        // 6. 控制項事件
+        document.getElementById('btn-clear-term').addEventListener('click', () => {
+            termBody.innerHTML = '';
+        });
+        document.getElementById('btn-toggle-scroll').addEventListener('click', (e) => {
+            autoScroll = !autoScroll;
+            e.target.innerText = `自動滾動: ${autoScroll ? '開啟' : '關閉'}`;
+        });
+        document.getElementById('btn-reconnect-all').addEventListener('click', () => {
+            if (hostWs) hostWs.close();
+            if (fanWs) fanWs.close();
+            document.getElementById('host-chat-box').innerHTML = '<div class="bubble bubble-system">[系統] 重新初始化連線...</div>';
+            document.getElementById('fan-chat-box').innerHTML = '<div class="bubble bubble-system">[系統] 重新初始化連線...</div>';
+            updateMobileQr();
+            setTimeout(() => {
+                connectHost();
+                connectFan();
+            }, 300);
+        });
+
+        // 7. 啟動初始化
+        window.addEventListener('load', () => {
+            initLogStream();
+            connectHost();
+            connectFan();
+            updateMobileQr();
+        });
+    </script>
+</body>
+</html>

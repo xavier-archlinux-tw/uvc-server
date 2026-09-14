@@ -41,6 +41,19 @@ services:
   #   networks:
   #     - uvc-net
 
+  # 🔥 展示專屬公網穿透容器 (Cloudflare Quick Tunnel)
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: uvc-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://nginx:80
+    depends_on:
+      - nginx
+    networks:
+      - uvc-net
+    profiles:
+      - demo
+
 networks:
   uvc-net:
     driver: bridge

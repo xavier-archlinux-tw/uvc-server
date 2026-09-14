@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>UVC 現場互動 - 觀眾端</title>
+    <style>
+        :root {
+            --bg-base: #0f1017;
+            --bg-card: #181a24;
+            --primary-fan: #00e5ff;
+            --host-gold: #ffb74d;
+            --text-main: #f0f2ff;
+            --text-muted: #8e92a8;
+            --accent-green: #00e676;
+            --accent-red: #ff5252;
+            --border: #2a2d3e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: var(--bg-base);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* 手機頂部 Header */
+        header {
+            background: var(--bg-card);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .header-title {
+            font-size: 1rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--primary-fan);
+        }
+        .status-badge {
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #202330;
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-red); }
+        .dot.connected { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
+
+        /* 房間資訊卡 */
+        .info-strip {
+            background: #12131c;
+            padding: 6px 16px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e202e;
+        }
+
+        /* 聊天氣泡滾動區 */
+        .chat-box {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            -webkit-overflow-scrolling: touch;
+        }
+        .bubble {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .bubble-self {
+            align-self: flex-end;
+            background: #142834;
+            border: 1px solid rgba(0, 229, 255, 0.4);
+            border-bottom-right-radius: 2px;
+        }
+        .bubble-host {
+            align-self: flex-start;
+            background: #2c2014;
+            border: 1px solid rgba(255, 183, 77, 0.4);
+            border-bottom-left-radius: 2px;
+        }
+        .bubble-system {
+            align-self: center;
+            background: rgba(255,255,255,0.06);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 6px;
+        }
+        .bubble-alert {
+            align-self: center;
+            background: rgba(255, 82, 82, 0.15);
+            color: var(--accent-red);
+            font-size: 0.78rem;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+        .sender-name {
+            font-size: 0.72rem;
+            font-weight: 800;
+            margin-bottom: 3px;
+        }
+        .sender-host { color: var(--host-gold); }
+        .sender-fan { color: var(--primary-fan); }
+
+        /* 底部操作列 */
+        .footer-bar {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            padding: 10px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .input-text {
+            flex: 1;
+            background: #0f1017;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 12px 14px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        .input-text:focus { border-color: var(--primary-fan); }
+        .btn-send {
+            background: var(--primary-fan);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 0.95rem;
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .btn-send:active { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-title">
+            <span>📱 現場觀眾端</span>
+        </div>
+        <div class="status-badge">
+            <div class="dot" id="status-dot"></div>
+            <span id="status-text">連線中...</span>
+        </div>
+    </header>
+
+    <div class="info-strip">
+        <span>配對角色: Audience (觀眾)</span>
+        <span id="room-tag">房間: 撮合中...</span>
+    </div>
+
+    <div class="chat-box" id="chat-box">
+        <div class="bubble bubble-system">[系統] 正在連接直播間 WebSocket 伺服器...</div>
+    </div>
+
+    <div class="footer-bar">
+        <input type="text" class="input-text" id="msg-input" placeholder="對主播發送即時應援彈幕..." value="合夥人手機現場實測！太酷了！">
+        <button class="btn-send" id="btn-send">發送</button>
+    </div>
+
+    <script>
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const roomTag = document.getElementById('room-tag');
+        const chatBox = document.getElementById('chat-box');
+        const msgInput = document.getElementById('msg-input');
+        const btnSend = document.getElementById('btn-send');
+
+        const nickname = "現場合夥人(手機)";
+        let ws = null;
+
+        function connect() {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusDot.classList.add('connected');
+                statusText.innerText = '已連線';
+                
+                // 自動發送撮合請求
+                const pkt = {
+                    action: 'join_match',
+                    sender: nickname,
+                    role: 'audience',
+                    data: 'Host_Fan'
+                };
+                ws.send(JSON.stringify(pkt));
+            };
+
+            ws.onmessage = (e) => {
+                const pkt = JSON.parse(e.data);
+
+                if (pkt.action === 'match_found') {
+                    const data = JSON.parse(pkt.data);
+                    roomTag.innerText = `房間: ${data.roomId}`;
+                    appendBubble('bubble-system', `[系統] 撮合成功！已進入房間 ${data.roomId}，主播是「${data.opponent}」`);
+                }
+                else if (pkt.action === 'broadcast_msg') {
+                    const isHost = pkt.role === 'host';
+                    const isSelf = pkt.sender === nickname;
+                    const styleClass = isSelf ? 'bubble-self' : (isHost ? 'bubble-host' : 'bubble-self');
+                    
+                    const senderColor = isHost ? 'sender-host' : 'sender-fan';
+                    const senderTitle = isHost ? '👑 主播 (VIP)' : `💬 ${pkt.sender}`;
+
+                    appendBubble(styleClass, `
+                        <div class="sender-name ${senderColor}">${senderTitle}</div>
+                        <div>${pkt.data}</div>
+                    `);
+                }
+                else if (pkt.action === 'rate_limited') {
+                    appendBubble('bubble-alert', `⚠️ [頻率限制] ${pkt.data}`);
+                }
+            };
+
+            ws.onclose = () => {
+                statusDot.classList.remove('connected');
+                statusText.innerText = '已斷線';
+                setTimeout(connect, 3000);
+            };
+        }
+
+        function appendBubble(className, innerHtml) {
+            const div = document.createElement('div');
+            div.className = `bubble ${className}`;
+            div.innerHTML = innerHtml;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        btnSend.addEventListener('click', () => {
+            const text = msgInput.value.trim();
+            if (text && ws && ws.readyState === WebSocket.OPEN) {
+                const pkt = {
+                    action: 'send_msg',
+                    sender: nickname,
+                    role: 'audience',
+                    data: text
+                };
+                ws.send(JSON.stringify(pkt));
+                msgInput.value = '';
+            }
+        });
+
+        msgInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') btnSend.click();
+        });
+
+        window.addEventListener('load', connect);
+    </script>
+</body>
+</html>

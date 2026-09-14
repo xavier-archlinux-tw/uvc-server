@@ -19,8 +19,6 @@ TestResults/
 *.log
 logs/
 
-# OS specific
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-.DS_Store
+# Runtime Generated
+tunnel-config.json
+web-api/wwwroot/tunnel-config.json
