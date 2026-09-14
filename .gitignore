@@ -1,0 +1,26 @@
+# Build and IDE artifacts
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosv
+*.sln.docstates
+.idea/
+.vscode/
+
+# Test Results
+TestResults/
+*.trx
+*.coverage
+*.opencover.xml
+
+# Logs
+*.log
+logs/
+
+# OS specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: uvc-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      - web-api
+    networks:
+      - uvc-net
+
+  web-api:
+    build:
+      context: ..
+      dockerfile: uvc-server/web-api/Dockerfile
+    container_name: uvc-web-api
+    restart: unless-stopped
+    environment:
+      - DOTNET_gcServer=0
+      - DOTNET_GCConserveMemory=9
+      - ASPNETCORE_URLS=http://+:5000
+      - ASPNETCORE_ENVIRONMENT=Production
+    expose:
+      - "5000"
+    networks:
+      - uvc-net
+
+  # 預留資料庫擴充插槽 (Phase 2-1 採用 In-Memory RingBuffer，避免 Linode 1GB VPS OOM)
+  # db:
+  #   image: postgres:16-alpine
+  #   container_name: uvc-db
+  #   environment:
+  #     POSTGRES_DB: uvc_chat
+  #     POSTGRES_USER: uvc_admin
+  #     POSTGRES_PASSWORD: secret_password
+  #   networks:
+  #     - uvc-net
+
+networks:
+  uvc-net:
+    driver: bridge

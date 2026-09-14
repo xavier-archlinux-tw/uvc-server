@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVC Web 雙向通訊測試主控台</title>
+    <style>
+        :root {
+            --bg-base: #121216;
+            --bg-card: #1a1a24;
+            --text-main: #f0f0f5;
+            --text-muted: #8c8c9e;
+            --primary-host: #ffb74d;
+            --vip-glow: #ffd54f;
+            --primary-fan: #00e5ff;
+            --accent-green: #00e676;
+            --accent-red: #ff5252;
+            --border: #2c2c3e;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg-base); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; padding: 12px; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        .title { font-size: 1.1rem; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .status-badge { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 4px 10px; border-radius: 12px; background: #20202d; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+        .status-dot.connected { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+
+        .container { display: flex; gap: 12px; flex: 1; min-height: 0; }
+        .panel { background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); display: flex; flex-direction: column; padding: 12px; }
+        .left-panel { flex: 1.1; display: flex; flex-direction: column; }
+        .right-panel { flex: 0.9; display: flex; flex-direction: column; }
+
+        .control-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+        .input-box { display: flex; flex-direction: column; gap: 4px; }
+        .input-box label { font-size: 0.75rem; color: var(--text-muted); }
+        .input-box input, .input-box select { background: #121218; border: 1px solid var(--border); color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 0.85rem; }
+        .input-box input:focus, .input-box select:focus { outline: none; border-color: var(--primary-fan); }
+
+        .btn-row { display: flex; gap: 6px; margin-bottom: 10px; }
+        button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 12px; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; }
+        .btn-connect { background: #2979ff; color: #fff; }
+        .btn-match { background: #7c4dff; color: #fff; }
+        .btn-spam { background: #ff7043; color: #fff; font-size: 0.75rem; }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
+
+        .chat-view { flex: 1; background: #14141c; border-radius: 6px; padding: 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; border: 1px solid #20202e; }
+        .msg-bubble { max-width: 85%; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; line-height: 1.4; word-break: break-word; }
+        .msg-self { align-self: flex-end; background: #263238; border-right: 3px solid var(--primary-fan); }
+        .msg-self.host-style { background: #3e2723; border-right: 3px solid var(--primary-host); box-shadow: 0 0 10px rgba(255, 183, 77, 0.2); }
+        .msg-other { align-self: flex-start; background: #1e1e28; border-left: 3px solid #607d8b; }
+        .msg-other.host-style { background: #2b1d0c; border-left: 3px solid var(--primary-host); box-shadow: 0 0 10px rgba(255, 183, 77, 0.2); }
+        .msg-system { align-self: center; font-size: 0.75rem; color: #ffd54f; background: rgba(255, 213, 79, 0.1); padding: 4px 8px; border-radius: 4px; }
+        .msg-alert { align-self: center; font-size: 0.75rem; color: #ff5252; background: rgba(255, 82, 82, 0.1); padding: 4px 8px; border-radius: 4px; }
+        .msg-sender { font-size: 0.7rem; font-weight: bold; margin-bottom: 2px; opacity: 0.8; }
+
+        .send-bar { display: flex; gap: 6px; margin-top: 10px; }
+        .send-bar input { flex: 1; background: #121218; border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; }
+        .btn-send { background: var(--accent-green); color: #000; font-weight: bold; }
+
+        .log-view { flex: 1; background: #0a0a0e; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 0.75rem; color: #a5d6a7; overflow-y: auto; border: 1px solid #1a1a26; white-space: pre-wrap; word-break: break-all; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="title">
+            <span id="role-icon">💬</span>
+            <span id="display-title">模擬 Client: 訪客</span>
+        </div>
+        <div class="status-badge">
+            <div id="status-dot" class="status-dot"></div>
+            <span id="status-text">未連線</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- 左面板：操作與即時聊天視窗 -->
+        <div class="panel left-panel">
+            <div class="control-group">
+                <div class="input-box">
+                    <label>連線暱稱</label>
+                    <input type="text" id="input-nickname" value="測試玩家">
+                </div>
+                <div class="input-box">
+                    <label>身分角色</label>
+                    <select id="select-role">
+                        <option value="audience">💬 觀眾 (Audience)</option>
+                        <option value="host">👑 主播 (Host)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-connect" id="btn-toggle-conn">連線 WebSocket</button>
+                <button class="btn-match" id="btn-join-match" disabled>加入四向配對 (join_match)</button>
+                <button class="btn-spam" id="btn-test-spam" disabled>防刷冷卻測試 (連點3次)</button>
+            </div>
+
+            <div class="chat-view" id="chat-messages">
+                <div class="msg-system">系統已就緒，請點擊連線開始測試。</div>
+            </div>
+
+            <div class="send-bar">
+                <input type="text" id="input-msg" placeholder="輸入訊息..." disabled>
+                <button class="btn-send" id="btn-send-msg" disabled>發送</button>
+            </div>
+        </div>
+
+        <!-- 右面板：即時 JSON 協議信封封包日誌 -->
+        <div class="panel right-panel">
+            <div style="font-size: 0.8rem; font-weight: bold; margin-bottom: 6px; color: var(--text-muted);">
+                📜 WebSocket 信封通訊日誌 (Raw JSON Trace)
+            </div>
+            <div class="log-view" id="log-view"></div>
+        </div>
+    </div>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const urlUser = params.get('user');
+        const urlRole = params.get('role');
+
+        const inputNickname = document.getElementById('input-nickname');
+        const selectRole = document.getElementById('select-role');
+        const displayTitle = document.getElementById('display-title');
+        const roleIcon = document.getElementById('role-icon');
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        const btnToggleConn = document.getElementById('btn-toggle-conn');
+        const btnJoinMatch = document.getElementById('btn-join-match');
+        const btnTestSpam = document.getElementById('btn-test-spam');
+        const chatMessages = document.getElementById('chat-messages');
+        const inputMsg = document.getElementById('input-msg');
+        const btnSendMsg = document.getElementById('btn-send-msg');
+        const logView = document.getElementById('log-view');
+
+        if (urlUser) inputNickname.value = urlUser;
+        if (urlRole && (urlRole === 'host' || urlRole === 'audience')) selectRole.value = urlRole;
+
+        function updateTitle() {
+            const isHost = selectRole.value === 'host';
+            roleIcon.textContent = isHost ? '👑' : '💬';
+            displayTitle.textContent = `${inputNickname.value} (${isHost ? '主播' : '觀眾'})`;
+        }
+        inputNickname.addEventListener('input', updateTitle);
+        selectRole.addEventListener('change', updateTitle);
+        updateTitle();
+
+        let ws = null;
+        let currentRoomId = null;
+
+        function appendLog(direction, text) {
+            const time = new Date().toISOString().split('T')[1].slice(0, 12);
+            const prefix = direction === 'SENT' ? '⬆️ [SENT]' : '⬇️ [RECV]';
+            logView.textContent += `[${time}] ${prefix} ${text}\n`;
+            logView.scrollTop = logView.scrollHeight;
+        }
+
+        function appendMessage(sender, role, text, type = 'normal') {
+            const div = document.createElement('div');
+            if (type === 'system') {
+                div.className = 'msg-system';
+                div.textContent = text;
+            } else if (type === 'alert') {
+                div.className = 'msg-alert';
+                div.textContent = text;
+            } else {
+                const isSelf = sender === inputNickname.value;
+                const isHost = role === 'host';
+                div.className = `msg-bubble ${isSelf ? 'msg-self' : 'msg-other'} ${isHost ? 'host-style' : ''}`;
+                div.innerHTML = `<div class="msg-sender">${isHost ? '👑 ' : ''}${sender}</div><div>${text}</div>`;
+            }
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendPacket(action, data = null) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const packet = {
+                action: action,
+                sender: inputNickname.value,
+                role: selectRole.value,
+                data: data,
+                timestamp: Date.now()
+            };
+            const json = JSON.stringify(packet);
+            ws.send(json);
+            appendLog('SENT', json);
+        }
+
+        btnToggleConn.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/ws`;
+            
+            appendLog('SYS', `連線至 ${wsUrl}...`);
+            statusText.textContent = '連線中...';
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusDot.classList.add('connected');
+                statusText.textContent = '已連線 (:8080)';
+                btnToggleConn.textContent = '中斷連線';
+                btnJoinMatch.disabled = false;
+                appendLog('SYS', 'WebSocket 握手成功 (101 Switching Protocols)');
+                appendMessage(null, null, '已連線至伺服器，可加入配對', 'system');
+            };
+
+            ws.onmessage = (event) => {
+                appendLog('RECV', event.data);
+                try {
+                    const pkt = JSON.parse(event.data);
+                    if (pkt.action === 'match_found') {
+                        const info = JSON.parse(pkt.data || '{}');
+                        currentRoomId = info.roomId;
+                        appendMessage(null, null, `🎉 撮合成功！進入房間: ${currentRoomId} (對手: ${info.opponent || '未知'})`, 'system');
+                        inputMsg.disabled = false;
+                        btnSendMsg.disabled = false;
+                        btnTestSpam.disabled = false;
+                    } else if (pkt.action === 'broadcast_msg') {
+                        appendMessage(pkt.sender, pkt.role, pkt.data);
+                    } else if (pkt.action === 'rate_limited') {
+                        appendMessage(null, null, `⚠️ ${pkt.data}`, 'alert');
+                    } else if (pkt.action === 'leave_room') {
+                        appendMessage(null, null, `🚪 ${pkt.data}`, 'alert');
+                    }
+                } catch (e) { }
+            };
+
+            ws.onclose = () => {
+                statusDot.classList.remove('connected');
+                statusText.textContent = '已斷線';
+                btnToggleConn.textContent = '連線 WebSocket';
+                btnJoinMatch.disabled = true;
+                inputMsg.disabled = true;
+                btnSendMsg.disabled = true;
+                btnTestSpam.disabled = true;
+                appendLog('SYS', '連線已關閉');
+                appendMessage(null, null, '連線已中斷', 'alert');
+            };
+        });
+
+        btnJoinMatch.addEventListener('click', () => {
+            sendPacket('join_match', 'werewolf');
+            appendMessage(null, null, '已發送加入配對請求，佇列撮合中...', 'system');
+        });
+
+        function doSend() {
+            const text = inputMsg.value.trim();
+            if (!text) return;
+            sendPacket('send_msg', text);
+            inputMsg.value = '';
+        }
+
+        btnSendMsg.addEventListener('click', doSend);
+        inputMsg.addEventListener('keypress', (e) => { if (e.key === 'Enter') doSend(); });
+
+        btnTestSpam.addEventListener('click', () => {
+            sendPacket('send_msg', '防刷測試 1');
+            setTimeout(() => sendPacket('send_msg', '防刷測試 2 (瞬間)'), 50);
+            setTimeout(() => sendPacket('send_msg', '防刷測試 3 (瞬間)'), 100);
+        });
+
+        // 供自動化腳本調用之 Hook API
+        window.uvcApi = {
+            connect: () => btnToggleConn.click(),
+            joinMatch: () => btnJoinMatch.click(),
+            sendMsg: (txt) => { inputMsg.value = txt; doSend(); },
+            spamTest: () => btnTestSpam.click()
+        };
+    </script>
+</body>
+</html>
