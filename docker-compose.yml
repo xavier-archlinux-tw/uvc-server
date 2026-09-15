@@ -11,6 +11,9 @@ services:
       - "8080:80"
     depends_on:
       - web-api
+    volumes:
+      # 掛載 Unity WebGL 編譯輸出目錄 (唯讀，decompressionFallback 模式靜態服務)
+      - ../uvc-client/Builds/WebGL:/var/www/webgl:ro
     networks:
       - uvc-net
 
