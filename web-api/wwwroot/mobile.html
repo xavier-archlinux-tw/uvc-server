@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>UVC 現場互動 - 觀眾端</title>
+    <title>UVC 現場互動 - 行動端</title>
     <style>
         :root {
             --bg-base: #0f1017;
@@ -15,6 +15,20 @@
             --accent-green: #00e676;
             --accent-red: #ff5252;
             --border: #2a2d3e;
+            --theme-color: #00e5ff;
+            --theme-glow: rgba(0, 229, 255, 0.4);
+            --theme-bubble: #142834;
+        }
+
+        body.role-host {
+            --theme-color: var(--host-gold);
+            --theme-glow: rgba(255, 183, 77, 0.4);
+            --theme-bubble: #2b1f14;
+        }
+        body.role-audience {
+            --theme-color: var(--primary-fan);
+            --theme-glow: rgba(0, 229, 255, 0.4);
+            --theme-bubble: #142834;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,47 +40,126 @@
             flex-direction: column;
             height: 100vh;
             overflow: hidden;
+            transition: background 0.3s;
         }
 
         /* 手機頂部 Header */
         header {
             background: var(--bg-card);
-            padding: 12px 16px;
+            padding: 10px 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
         }
         .header-title {
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 800;
             display: flex;
             align-items: center;
             gap: 6px;
-            color: var(--primary-fan);
+            color: var(--theme-color);
+            transition: color 0.2s;
         }
         .status-badge {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             display: flex;
             align-items: center;
             gap: 6px;
             background: #202330;
-            padding: 4px 10px;
+            padding: 3px 8px;
             border-radius: 12px;
         }
         .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-red); }
         .dot.connected { background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); }
 
-        /* 房間資訊卡 */
+        /* 頂部身分設定列 (Role & Name Setup) */
+        .setup-strip {
+            background: #141520;
+            border-bottom: 1px solid var(--border);
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .setup-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .role-selector {
+            display: flex;
+            flex: 1;
+            background: #090a10;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px;
+            gap: 2px;
+        }
+        .role-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 6px 4px;
+            border-radius: 4px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .role-btn.active.host-active {
+            background: var(--host-gold);
+            color: #000;
+            box-shadow: 0 0 8px rgba(255, 183, 77, 0.4);
+        }
+        .role-btn.active.fan-active {
+            background: var(--primary-fan);
+            color: #000;
+            box-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+        }
+
+        .name-box {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .mobile-name-input {
+            flex: 1;
+            background: #090a10;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .mobile-name-input:focus { border-color: var(--theme-color); }
+        .btn-join {
+            background: #25283b;
+            color: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-join:hover { background: var(--theme-color); color: #000; }
+
+        /* 房間與角色資訊條 */
         .info-strip {
-            background: #12131c;
-            padding: 6px 16px;
+            background: #10111a;
+            padding: 6px 14px;
             font-size: 0.72rem;
             color: var(--text-muted);
             display: flex;
             justify-content: space-between;
-            border-bottom: 1px solid #1e202e;
+            border-bottom: 1px solid #1a1c29;
         }
+        .info-strip strong { color: var(--theme-color); }
 
         /* 聊天氣泡滾動區 */
         .chat-box {
@@ -88,14 +181,20 @@
         }
         .bubble-self {
             align-self: flex-end;
-            background: #142834;
-            border: 1px solid rgba(0, 229, 255, 0.4);
+            background: var(--theme-bubble);
+            border: 1px solid var(--theme-glow);
             border-bottom-right-radius: 2px;
         }
-        .bubble-host {
+        .bubble-other-host {
             align-self: flex-start;
             background: #2c2014;
             border: 1px solid rgba(255, 183, 77, 0.4);
+            border-bottom-left-radius: 2px;
+        }
+        .bubble-other-fan {
+            align-self: flex-start;
+            background: #142834;
+            border: 1px solid rgba(0, 229, 255, 0.4);
             border-bottom-left-radius: 2px;
         }
         .bubble-system {
@@ -139,28 +238,41 @@
             color: #fff;
             padding: 12px 14px;
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             outline: none;
+            transition: border-color 0.2s;
         }
-        .input-text:focus { border-color: var(--primary-fan); }
+        .input-text:focus { border-color: var(--theme-color); }
         .btn-send {
-            background: var(--primary-fan);
+            background: var(--theme-color);
             color: #000;
             border: none;
             border-radius: 8px;
             padding: 12px 18px;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             font-weight: 800;
             cursor: pointer;
+            transition: opacity 0.2s;
         }
         .btn-send:active { opacity: 0.8; }
+        .btn-spam {
+            background: #2e1d20;
+            color: #ff8a80;
+            border: 1px solid rgba(255, 82, 82, 0.3);
+            border-radius: 8px;
+            padding: 12px 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
     </style>
 </head>
-<body>
+<body class="role-audience">
 
+    <!-- 頂部狀態列 -->
     <header>
-        <div class="header-title">
-            <span>📱 現場觀眾端</span>
+        <div class="header-title" id="header-title">
+            <span>💬 現場觀眾端 (Mobile)</span>
         </div>
         <div class="status-badge">
             <div class="dot" id="status-dot"></div>
@@ -168,8 +280,22 @@
         </div>
     </header>
 
+    <!-- 頂部身分自選與名稱設定列 -->
+    <div class="setup-strip">
+        <div class="setup-row">
+            <div class="role-selector">
+                <button class="role-btn" id="btn-role-host">👑 主播 (Host)</button>
+                <button class="role-btn active fan-active" id="btn-role-fan">💬 觀眾 (Fan)</button>
+            </div>
+        </div>
+        <div class="setup-row name-box">
+            <input type="text" id="mobile-name-input" class="mobile-name-input" placeholder="自訂顯示名稱" value="現場合夥人(手機)">
+            <button id="btn-reconnect" class="btn-join">重新配對</button>
+        </div>
+    </div>
+
     <div class="info-strip">
-        <span>配對角色: Audience (觀眾)</span>
+        <span id="role-tag">當前角色: <strong>Audience (觀眾)</strong></span>
         <span id="room-tag">房間: 撮合中...</span>
     </div>
 
@@ -178,8 +304,9 @@
     </div>
 
     <div class="footer-bar">
-        <input type="text" class="input-text" id="msg-input" placeholder="對主播發送即時應援彈幕..." value="合夥人手機現場實測！太酷了！">
+        <input type="text" class="input-text" id="msg-input" placeholder="輸入訊息..." value="合夥人手機現場實測！太酷了！">
         <button class="btn-send" id="btn-send">發送</button>
+        <button class="btn-spam" id="btn-spam" title="測試 700ms 頻率限制">防刷</button>
     </div>
 
     <script>
@@ -188,13 +315,81 @@
 
         const statusDot = document.getElementById('status-dot');
         const statusText = document.getElementById('status-text');
+        const headerTitle = document.getElementById('header-title');
+        const roleTag = document.getElementById('role-tag');
         const roomTag = document.getElementById('room-tag');
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg-input');
         const btnSend = document.getElementById('btn-send');
+        const btnSpam = document.getElementById('btn-spam');
+        const nameInput = document.getElementById('mobile-name-input');
+        const btnRoleHost = document.getElementById('btn-role-host');
+        const btnRoleFan = document.getElementById('btn-role-fan');
+        const btnReconnect = document.getElementById('btn-reconnect');
 
-        const nickname = "現場合夥人(手機)";
+        // 解析 URL 參數
+        const urlParams = new URLSearchParams(window.location.search);
+        let currentRole = urlParams.get('role') === 'host' ? 'host' : 'audience';
+        let currentNickname = urlParams.get('name') || (currentRole === 'host' ? '星光主播·晨星' : '現場合夥人(手機)');
+
+        nameInput.value = currentNickname;
         let ws = null;
+
+        // 應用角色樣式
+        function applyRoleTheme(role) {
+            currentRole = role;
+            document.body.className = role === 'host' ? 'role-host' : 'role-audience';
+            
+            if (role === 'host') {
+                btnRoleHost.className = 'role-btn active host-active';
+                btnRoleFan.className = 'role-btn';
+                headerTitle.innerHTML = '<span>👑 現場主播端 (Mobile)</span>';
+                roleTag.innerHTML = '當前角色: <strong>Host (主播 / VIP)</strong>';
+                if (!urlParams.get('name') && nameInput.value === '現場合夥人(手機)') {
+                    nameInput.value = '星光主播·晨星';
+                }
+            } else {
+                btnRoleHost.className = 'role-btn';
+                btnRoleFan.className = 'role-btn active fan-active';
+                headerTitle.innerHTML = '<span>💬 現場觀眾端 (Mobile)</span>';
+                roleTag.innerHTML = '當前角色: <strong>Audience (觀眾)</strong>';
+                if (!urlParams.get('name') && nameInput.value === '星光主播·晨星') {
+                    nameInput.value = '現場合夥人(手機)';
+                }
+            }
+        }
+
+        applyRoleTheme(currentRole);
+
+        // 角色按鈕監聽
+        btnRoleHost.addEventListener('click', () => {
+            if (currentRole !== 'host') {
+                applyRoleTheme('host');
+                reconnect();
+            }
+        });
+
+        btnRoleFan.addEventListener('click', () => {
+            if (currentRole !== 'audience') {
+                applyRoleTheme('audience');
+                reconnect();
+            }
+        });
+
+        btnReconnect.addEventListener('click', reconnect);
+
+        function reconnect() {
+            if (ws) {
+                ws.close();
+            }
+            chatBox.innerHTML = '<div class="bubble bubble-system">[系統] 重新初始化連線與撮合...</div>';
+            roomTag.innerText = '房間: 撮合中...';
+            connect();
+        }
+
+        function getNickname() {
+            return nameInput.value.trim() || (currentRole === 'host' ? '一瞬晨星' : '熱情觀眾');
+        }
 
         function connect() {
             ws = new WebSocket(wsUrl);
@@ -203,11 +398,11 @@
                 statusDot.classList.add('connected');
                 statusText.innerText = '已連線';
                 
-                // 自動發送撮合請求
+                // 發送撮合請求
                 const pkt = {
                     action: 'join_match',
-                    sender: nickname,
-                    role: 'audience',
+                    sender: getNickname(),
+                    role: currentRole,
                     data: 'Host_Fan'
                 };
                 ws.send(JSON.stringify(pkt));
@@ -219,17 +414,21 @@
                 if (pkt.action === 'match_found') {
                     const data = JSON.parse(pkt.data);
                     roomTag.innerText = `房間: ${data.roomId}`;
-                    appendBubble('bubble-system', `[系統] 撮合成功！已進入房間 ${data.roomId}，主播是「${data.opponent}」`);
+                    appendBubble('bubble-system', `[系統] 撮合成功！已進入房間 ${data.roomId}，配對對象為「${data.opponent}」`);
                 }
                 else if (pkt.action === 'broadcast_msg') {
                     const isHost = pkt.role === 'host';
-                    const isSelf = pkt.sender === nickname;
-                    const styleClass = isSelf ? 'bubble-self' : (isHost ? 'bubble-host' : 'bubble-self');
+                    const isSelf = pkt.sender === getNickname();
+                    
+                    let bubbleClass = 'bubble-self';
+                    if (!isSelf) {
+                        bubbleClass = isHost ? 'bubble-other-host' : 'bubble-other-fan';
+                    }
                     
                     const senderColor = isHost ? 'sender-host' : 'sender-fan';
-                    const senderTitle = isHost ? '👑 主播 (VIP)' : `💬 ${pkt.sender}`;
+                    const senderTitle = isHost ? `👑 ${pkt.sender} (VIP)` : `💬 ${pkt.sender}`;
 
-                    appendBubble(styleClass, `
+                    appendBubble(bubbleClass, `
                         <div class="sender-name ${senderColor}">${senderTitle}</div>
                         <div>${pkt.data}</div>
                     `);
@@ -242,7 +441,6 @@
             ws.onclose = () => {
                 statusDot.classList.remove('connected');
                 statusText.innerText = '已斷線';
-                setTimeout(connect, 3000);
             };
         }
 
@@ -259,8 +457,8 @@
             if (text && ws && ws.readyState === WebSocket.OPEN) {
                 const pkt = {
                     action: 'send_msg',
-                    sender: nickname,
-                    role: 'audience',
+                    sender: getNickname(),
+                    role: currentRole,
                     data: text
                 };
                 ws.send(JSON.stringify(pkt));
@@ -270,6 +468,17 @@
 
         msgInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') btnSend.click();
+        });
+
+        btnSpam.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const pkt1 = { action: 'send_msg', sender: getNickname(), role: currentRole, data: '手機連續發言 (1)' };
+                ws.send(JSON.stringify(pkt1));
+                setTimeout(() => {
+                    const pkt2 = { action: 'send_msg', sender: getNickname(), role: currentRole, data: '手機連續發言 (2 - 觸發冷卻)' };
+                    ws.send(JSON.stringify(pkt2));
+                }, 80);
+            }
         });
 
         window.addEventListener('load', connect);

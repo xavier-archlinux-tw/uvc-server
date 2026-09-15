@@ -127,6 +127,22 @@
         }
         .client-identity.host-color { color: var(--host-gold); }
         .client-identity.fan-color { color: var(--fan-cyan); }
+        .name-edit-input {
+            background: #141622;
+            border: 1px solid var(--border-panel);
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            outline: none;
+            width: 140px;
+            transition: all 0.2s;
+        }
+        .host-theme .name-edit-input { color: var(--host-gold); }
+        .host-theme .name-edit-input:focus { border-color: var(--host-gold); box-shadow: 0 0 6px var(--host-glow); background: #1f1a14; }
+        .fan-theme .name-edit-input { color: var(--fan-cyan); }
+        .fan-theme .name-edit-input:focus { border-color: var(--fan-cyan); box-shadow: 0 0 6px var(--fan-glow); background: #121f24; }
         .client-substatus {
             font-size: 0.75rem;
             color: var(--text-muted);
@@ -412,7 +428,8 @@
         <div class="client-card host-theme">
             <div class="client-header">
                 <div class="client-identity host-color">
-                    <span>👑 一瞬晨星 (Host / VIP)</span>
+                    <span>👑 主播:</span>
+                    <input type="text" id="host-name-input" class="name-edit-input" value="一瞬晨星" title="可自行輸入主播顯示名稱">
                 </div>
                 <div class="client-substatus" id="host-status">WebSocket: 連線中...</div>
             </div>
@@ -460,7 +477,8 @@
         <div class="client-card fan-theme">
             <div class="client-header">
                 <div class="client-identity fan-color">
-                    <span>💬 DD死忠粉 (Audience / 觀眾端)</span>
+                    <span>💬 觀眾:</span>
+                    <input type="text" id="fan-name-input" class="name-edit-input" value="DD死忠粉" title="可自行輸入觀眾顯示名稱">
                 </div>
                 <div class="client-substatus" id="fan-status">WebSocket: 連線中...</div>
             </div>
@@ -541,14 +559,22 @@
             }
         }
 
+        // 獲取自訂顯示名稱
+        function getHostName() {
+            return (document.getElementById('host-name-input')?.value.trim()) || '一瞬晨星';
+        }
+        function getFanName() {
+            return (document.getElementById('fan-name-input')?.value.trim()) || 'DD死忠粉';
+        }
+
         // 2. 初始化主播端 WebSocket
         function connectHost() {
             hostWs = new WebSocket(wsUrl);
             hostWs.onopen = () => {
                 document.getElementById('host-status').innerText = '狀態: [LIVE Connected]';
                 document.getElementById('host-status').style.color = 'var(--accent-green)';
-                // 自動發起撮合
-                sendPacket(hostWs, 'join_match', '一瞬晨星', 'host', 'Host_Fan');
+                // 自動發起撮合 (使用自訂主播名稱)
+                sendPacket(hostWs, 'join_match', getHostName(), 'host', 'Host_Fan');
             };
             hostWs.onmessage = (e) => {
                 const pkt = JSON.parse(e.data);
@@ -566,7 +592,8 @@
             fanWs.onopen = () => {
                 document.getElementById('fan-status').innerText = '狀態: [LIVE Connected]';
                 document.getElementById('fan-status').style.color = 'var(--accent-green)';
-                sendPacket(fanWs, 'join_match', 'DD死忠粉', 'audience', 'Host_Fan');
+                // 自動發起撮合 (使用自訂觀眾名稱)
+                sendPacket(fanWs, 'join_match', getFanName(), 'audience', 'Host_Fan');
             };
             fanWs.onmessage = (e) => {
                 const pkt = JSON.parse(e.data);
@@ -619,29 +646,35 @@
         document.getElementById('host-send-btn').addEventListener('click', () => {
             const input = document.getElementById('host-input');
             if (input.value.trim()) {
-                sendPacket(hostWs, 'send_msg', '一瞬晨星', 'host', input.value.trim());
+                sendPacket(hostWs, 'send_msg', getHostName(), 'host', input.value.trim());
                 input.value = '';
             }
         });
         document.getElementById('host-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') document.getElementById('host-send-btn').click();
         });
+        document.getElementById('host-name-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('btn-reconnect-all').click();
+        });
 
         document.getElementById('fan-send-btn').addEventListener('click', () => {
             const input = document.getElementById('fan-input');
             if (input.value.trim()) {
-                sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', input.value.trim());
+                sendPacket(fanWs, 'send_msg', getFanName(), 'audience', input.value.trim());
                 input.value = '';
             }
         });
         document.getElementById('fan-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') document.getElementById('fan-send-btn').click();
         });
+        document.getElementById('fan-name-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('btn-reconnect-all').click();
+        });
 
         document.getElementById('fan-spam-btn').addEventListener('click', () => {
-            sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', '連發第1則訊息');
+            sendPacket(fanWs, 'send_msg', getFanName(), 'audience', '連發第1則訊息');
             setTimeout(() => {
-                sendPacket(fanWs, 'send_msg', 'DD死忠粉', 'audience', '連發第2則訊息(觸發冷卻)');
+                sendPacket(fanWs, 'send_msg', getFanName(), 'audience', '連發第2則訊息(觸發冷卻)');
             }, 80);
         });
 
