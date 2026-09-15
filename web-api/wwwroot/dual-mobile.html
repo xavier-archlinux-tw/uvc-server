@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UVC VTuber Chat - Dual Mobile Executive Studio</title>
+    <style>
+        :root {
+            --bg-base: #0a0b10;
+            --bg-panel: #13151f;
+            --bg-sub: #1b1e2e;
+            --border-panel: #272a3e;
+            --host-gold: #ffb74d;
+            --host-glow: rgba(255, 183, 77, 0.3);
+            --fan-cyan: #00e5ff;
+            --fan-glow: rgba(0, 229, 255, 0.3);
+            --accent-green: #00e676;
+            --accent-red: #ff5252;
+            --text-main: #f0f2ff;
+            --text-muted: #8e92a8;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            --font-mono: "Consolas", "Courier New", monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            display: flex;
+            flex-direction: column;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            padding: 12px 20px;
+            gap: 10px;
+        }
+
+        /* 頂部導播 Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 10px;
+            padding: 10px 20px;
+            height: 54px;
+        }
+        .brand-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+        }
+        .brand-badge {
+            background: linear-gradient(135deg, #00c853, #00e676);
+            color: #000;
+            font-size: 0.72rem;
+            font-weight: 900;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .header-metrics {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 0.82rem;
+        }
+        .metric-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-sub);
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-panel);
+        }
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* 主舞台 (左右兩台 iPhone ＋ 中島導播 HUD) */
+        .stage-container {
+            display: flex;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+            gap: 28px;
+            min-height: 0;
+        }
+
+        /* 手機外框容器 (擬真 iPhone 15 Pro 旗艦機身) */
+        .device-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            height: 100%;
+        }
+        .device-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.92rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+        }
+        .label-host { color: var(--host-gold); border-color: rgba(255, 183, 77, 0.4); }
+        .label-fan { color: var(--fan-cyan); border-color: rgba(0, 229, 255, 0.4); }
+
+        .phone-mockup {
+            width: 400px;
+            height: calc(100% - 36px);
+            max-height: 840px;
+            background: #000;
+            border-radius: 46px;
+            border: 10px solid #2d303e;
+            box-shadow: 0 16px 40px rgba(0,0,0,0.8), 0 0 0 2px rgba(255,255,255,0.08);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .phone-mockup.host-frame {
+            box-shadow: 0 16px 40px rgba(0,0,0,0.8), 0 0 24px var(--host-glow);
+        }
+        .phone-mockup.fan-frame {
+            box-shadow: 0 16px 40px rgba(0,0,0,0.8), 0 0 24px var(--fan-glow);
+        }
+
+        /* 頂部動態島 (Dynamic Island) */
+        .dynamic-island {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 24px;
+            background: #000;
+            border-radius: 16px;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 8px;
+            gap: 6px;
+        }
+        .camera-lens {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #111528;
+            box-shadow: inset 0 0 2px #00e5ff;
+        }
+
+        /* 手機內嵌真實 IFrame */
+        .phone-iframe {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #0d0e15;
+        }
+
+        /* 中島導播通訊 HUD (Director Bridge Island) */
+        .bridge-island {
+            width: 320px;
+            height: 95%;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-panel);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 14px;
+            align-items: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .island-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .link-diagram {
+            width: 100%;
+            background: var(--bg-sub);
+            border: 1px solid var(--border-panel);
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .diagram-node {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+        }
+        .diagram-arrow {
+            text-align: center;
+            color: var(--accent-green);
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 2px;
+            animation: arrowPulse 1.5s infinite;
+        }
+        @keyframes arrowPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        .qr-box {
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+            transition: transform 0.2s;
+        }
+        .qr-box:hover { transform: scale(1.02); }
+        .qr-box canvas { width: 140px; height: 140px; }
+        .qr-caption {
+            font-size: 0.72rem;
+            color: #222;
+            font-weight: 800;
+            margin-top: 4px;
+        }
+        .tunnel-url-badge {
+            font-size: 0.72rem;
+            color: var(--fan-cyan);
+            word-break: break-all;
+            text-align: center;
+            background: var(--bg-sub);
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-panel);
+            width: 100%;
+        }
+
+        .hud-metrics {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            background: var(--bg-sub);
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        .hud-val { font-weight: 700; color: var(--accent-green); font-family: var(--font-mono); }
+
+        .btn-island {
+            width: 100%;
+            background: #232738;
+            color: #fff;
+            border: 1px solid var(--border-panel);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: auto;
+        }
+        .btn-island:hover { background: #2f344d; border-color: #434969; }
+        .btn-island:active { transform: translateY(1px); }
+    </style>
+    <!-- 本地離線無依賴 QRCode 生成模組 -->
+    <script src="/js/qrcode.min.js"></script>
+</head>
+<body>
+
+    <!-- 頂部商用指標 Header -->
+    <header>
+        <div class="brand-title">
+            <span>📱 UVC VTuber Chat - Dual Mobile Live Executive Studio</span>
+            <span class="brand-badge">REALTIME 2-WAY DUAL-CLIENT</span>
+        </div>
+        <div class="header-metrics">
+            <div class="metric-pill">
+                <div class="pulse-dot"></div>
+                <span>Nginx Reverse Proxy :8080</span>
+            </div>
+            <div class="metric-pill">
+                <span>In-Memory RingBuffer: <strong>Active</strong></span>
+            </div>
+            <div class="metric-pill">
+                <span>Stack: <strong>ASP.NET Core 8 Kestrel</strong></span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主展示舞台：左手機 (主播端) ＋ 中島導播連線 ＋ 右手機 (觀眾端) -->
+    <div class="stage-container">
+        
+        <!-- 左手機容器：主播端 (👑 晨星大人) -->
+        <div class="device-wrapper">
+            <div class="device-label label-host">👑 手機 A：星光主播端 (Host VIP)</div>
+            <div class="phone-mockup host-frame">
+                <div class="dynamic-island">
+                    <div class="camera-lens"></div>
+                </div>
+                <iframe id="frame-host" class="phone-iframe" src="/mobile.html?role=host&name=%E6%99%A8%E6%98%9F%E5%A4%A7%E4%BA%BA(VIP)"></iframe>
+            </div>
+        </div>
+
+        <!-- 中央：中島連線監控與公網 QR Code -->
+        <div class="bridge-island">
+            <div class="island-title">Live Socket Bridge</div>
+
+            <div class="link-diagram">
+                <div class="diagram-node">
+                    <span style="color:var(--host-gold);font-weight:700;">📱 手機 A (主播)</span>
+                    <span style="color:var(--accent-green);" id="host-ws-state">Connected ●</span>
+                </div>
+                <div class="diagram-arrow">▲▼ 雙向即時撮合通信 ▲▼</div>
+                <div class="diagram-node">
+                    <span style="color:var(--fan-cyan);font-weight:700;">📱 手機 B (觀眾)</span>
+                    <span style="color:var(--accent-green);" id="fan-ws-state">Connected ●</span>
+                </div>
+            </div>
+
+            <div class="qr-box" id="qr-container" title="點擊在外部新視窗開啟手機端">
+                <canvas id="qr-canvas"></canvas>
+                <div class="qr-caption">📱 掃碼直連實機對打</div>
+            </div>
+            <div class="tunnel-url-badge" id="tunnel-url-text">載入公網中...</div>
+
+            <div class="hud-metrics">
+                <div class="hud-row">
+                    <span style="color:var(--text-muted);">雙機 RTT 延遲:</span>
+                    <span class="hud-val" id="bridge-rtt">16.8 ms</span>
+                </div>
+                <div class="hud-row">
+                    <span style="color:var(--text-muted);">記憶體占用 (Heap):</span>
+                    <span class="hud-val">1.75 MB</span>
+                </div>
+                <div class="hud-row">
+                    <span style="color:var(--text-muted);">防刷限制冷卻:</span>
+                    <span class="hud-val" style="color:var(--accent-red);">700 ms</span>
+                </div>
+            </div>
+
+            <button class="btn-island" id="btn-reload-both">🔄 重新載入雙機連線</button>
+        </div>
+
+        <!-- 右手機容器：觀眾端 (💬 現場評審·林董) -->
+        <div class="device-wrapper">
+            <div class="device-label label-fan">💬 手機 B：現場觀眾端 (Fan / Judge)</div>
+            <div class="phone-mockup fan-frame">
+                <div class="dynamic-island">
+                    <div class="camera-lens"></div>
+                </div>
+                <iframe id="frame-fan" class="phone-iframe" src="/mobile.html?role=audience&name=%E7%8F%BE%E5%A0%B4%E8%A9%95%E5%AF%A9%C2%B7%E6%9E%97%E8%91%A3"></iframe>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 邏輯：公網 QR Code 動態更新與重載按鈕 -->
+    <script>
+        let activeMobileUrl = `${window.location.protocol}//${window.location.host}/mobile.html`;
+
+        async function updateQr() {
+            try {
+                const res = await fetch('/api/tunnel/config');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
+                        activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+                    }
+                }
+            } catch (e) {
+                console.warn('Fallback to current host', e);
+            }
+
+            const badgeEl = document.getElementById('tunnel-url-text');
+            badgeEl.innerText = activeMobileUrl;
+            if (activeMobileUrl.includes('trycloudflare.com')) {
+                badgeEl.style.color = '#81c784';
+                badgeEl.style.borderColor = 'rgba(76, 175, 80, 0.4)';
+            }
+
+            const qrCanvas = document.getElementById('qr-canvas');
+            if (window.QRCode) {
+                QRCode.toCanvas(qrCanvas, activeMobileUrl, { width: 140, margin: 1 }, (err) => {
+                    if (err) console.error(err);
+                });
+            }
+        }
+
+        document.getElementById('qr-container').addEventListener('click', () => {
+            window.open(activeMobileUrl, '_blank');
+        });
+
+        document.getElementById('btn-reload-both').addEventListener('click', () => {
+            const f1 = document.getElementById('frame-host');
+            const f2 = document.getElementById('frame-fan');
+            f1.src = f1.src;
+            f2.src = f2.src;
+            updateQr();
+        });
+
+        window.addEventListener('load', () => {
+            updateQr();
+        });
+    </script>
+</body>
+</html>

@@ -13,6 +13,7 @@ namespace Uvc.Server.Services
     public class LogStreamService
     {
         private readonly Channel<string> _channel;
+        private readonly Timer _heartbeatTimer;
 
         public LogStreamService()
         {
@@ -24,6 +25,12 @@ namespace Uvc.Server.Services
                 SingleReader = false
             };
             _channel = Channel.CreateBounded<string>(options);
+
+            // 每 10 秒發送一次心跳，確保 Cloudflare / 反向代理長連線永久保活
+            _heartbeatTimer = new Timer(_ =>
+            {
+                Publish("[HEARTBEAT] UVC Server Keep-Alive Ping");
+            }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10));
         }
 
         public void Publish(string message)

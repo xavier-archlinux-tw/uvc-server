@@ -397,8 +397,8 @@
         .log-tag-sys { color: #8c8c9e; }
         .log-time { color: #5c5f78; margin-right: 4px; }
     </style>
-    <!-- 輕量免外聯純前端 QR Code 生成庫 -->
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <!-- 輕量免外聯純前端 QR Code 生成庫 (100% 離線本地化) -->
+    <script src="/js/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -493,12 +493,12 @@
         </div>
     </div>
 
-    <!-- 視角 3：下方 Cyber Terminal HUD (即時 Docker Compose stdout 日誌) -->
+    <!-- 視角 3：下方 Cyber Terminal HUD (即時 uvc 伺服器動態串流) -->
     <div class="terminal-hud">
         <div class="terminal-header">
             <div class="terminal-title">
-                <span>● DOCKER COMPOSE STREAM TERMINAL</span>
-                <span style="color:#666;">(Live stdout / SSE :8080/api/logs/stream)</span>
+                <span>● uvc 伺服器動態</span>
+                <span style="color:#666;">(Live SSE /api/logs/stream)</span>
             </div>
             <div class="terminal-actions">
                 <button class="terminal-btn" id="btn-toggle-scroll">自動滾動: 開啟</button>
@@ -547,6 +547,8 @@
                 coloredText = coloredText.replace(/(\[RATE_LIMIT\])/g, '<span class="log-tag-rate">$1</span>');
             } else if (coloredText.includes('[TUNNEL]')) {
                 coloredText = coloredText.replace(/(\[TUNNEL\][^\n]+)/g, '<span class="log-tag-tunnel">$1</span>');
+            } else if (coloredText.includes('[HEARTBEAT]')) {
+                coloredText = coloredText.replace(/(\[HEARTBEAT\][^\n]+)/g, '<span style="color:#5c6bc0;font-style:italic;">$1</span>');
             } else {
                 coloredText = `<span class="log-tag-sys">${coloredText}</span>`;
             }
