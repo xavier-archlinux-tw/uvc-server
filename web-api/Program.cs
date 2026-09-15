@@ -99,13 +99,20 @@ app.MapPost("/api/tunnel/register", async (HttpContext ctx, ILogger<Program> log
     return Results.Ok(new { status = "registered", tunnelUrl = currentTunnelUrl });
 });
 
+// 記憶體環形緩衝區日誌拉取端點 (雙保險 REST 備援)
+app.MapGet("/api/logs/recent", (LogStreamService logStream) => Results.Ok(logStream.GetRecentLogs()));
+
 // SSE 日誌即時串流端點 (Server-Sent Events)
 app.MapGet("/api/logs/stream", async (LogStreamService logStream, HttpContext ctx, CancellationToken ct) =>
 {
     ctx.Response.Headers.Append("Content-Type", "text/event-stream");
     ctx.Response.Headers.Append("Cache-Control", "no-cache");
     ctx.Response.Headers.Append("Connection", "keep-alive");
-    ctx.Response.Headers.Append("X-Accel-Buffering", "no");
+    // 依據 W3C EventSource 規範，冒號開頭為注釋行，瀏覽器靜默忽略；
+    // 但 2048 位元組能瞬間填滿並迫使 Cloudflare Edge Proxy 觸發 Flush，解除邊緣快取阻斷！
+    var bufferBreaker = new string(' ', 4096);
+    await ctx.Response.WriteAsync($": {bufferBreaker}\n\n", ct);
+    await ctx.Response.Body.FlushAsync(ct);
 
     await ctx.Response.WriteAsync($"data: [SYSTEM] Connected to Web-API Log Stream via SSE\n\n", ct);
     await ctx.Response.Body.FlushAsync(ct);

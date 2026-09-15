@@ -381,16 +381,21 @@
         let activeMobileUrl = `${window.location.protocol}//${window.location.host}/mobile.html`;
 
         async function updateQr() {
-            try {
-                const res = await fetch('/api/tunnel/config');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
-                        activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+            const isOriginPublic = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+            if (isOriginPublic) {
+                activeMobileUrl = `${window.location.origin}/mobile.html`;
+            } else {
+                try {
+                    const res = await fetch('/api/tunnel/config');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
+                            activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+                        }
                     }
+                } catch (e) {
+                    console.warn('Fallback to current host', e);
                 }
-            } catch (e) {
-                console.warn('Fallback to current host', e);
             }
 
             const badgeEl = document.getElementById('tunnel-url-text');

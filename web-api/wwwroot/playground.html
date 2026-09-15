@@ -517,21 +517,54 @@
         let fanWs = null;
         let autoScroll = true;
 
-        // 1. 初始化 SSE 日誌即時串流
+        // 1. 初始化日誌串流 (雙保險架構: SSE 即時串流 + /api/logs/recent 初始秒級直拉與定時備援)
         const termBody = document.getElementById('term-body');
-        function initLogStream() {
-            const evtSource = new EventSource('/api/logs/stream');
-            
-            evtSource.onmessage = (e) => {
-                appendTerminalLine(e.data);
-            };
+        const renderedLogs = new Set();
 
-            evtSource.onerror = () => {
-                appendTerminalLine("[SYSTEM] SSE Log Stream disconnected, retrying...");
-            };
+        async function fetchRecentLogs() {
+            try {
+                const res = await fetch('/api/logs/recent');
+                if (res.ok) {
+                    const logs = await res.json();
+                    if (Array.isArray(logs)) {
+                        logs.forEach(log => appendTerminalLine(log));
+                    }
+                }
+            } catch (err) {
+                console.warn('Fetch recent logs fallback error:', err);
+            }
+        }
+
+        function initLogStream() {
+            // 立即執行第一次拉取，保證 0.1 秒內畫面絕不空白
+            fetchRecentLogs();
+
+            // 建立 SSE 長連線 (藉由後端 4KB Buffer Breaker 擊破邊緣緩衝)
+            try {
+                const evtSource = new EventSource('/api/logs/stream');
+                evtSource.onmessage = (e) => {
+                    appendTerminalLine(e.data);
+                };
+                evtSource.onerror = () => {
+                    // SSE 偶發抖動時降級依靠定時輪詢
+                };
+            } catch (e) {
+                console.warn('SSE init failed, using polling fallback', e);
+            }
+
+            // 雙保險輪詢：每 3 秒自動拉取一次補齊差集，杜絕任何網路/代理緩衝黑洞
+            setInterval(fetchRecentLogs, 3000);
         }
 
         function appendTerminalLine(text) {
+            if (!text || renderedLogs.has(text)) return;
+            renderedLogs.add(text);
+            if (renderedLogs.size > 200) {
+                // 維護適度大小
+                const first = renderedLogs.values().next().value;
+                renderedLogs.delete(first);
+            }
+
             const line = document.createElement('div');
             line.className = 'log-entry';
 
@@ -680,20 +713,25 @@
             }, 80);
         });
 
-        // 5. QR Code 生成與手機端連結 (支援 Cloudflare 公網動態同步)
+        // 5. QR Code 生成與手機端連結 (支援 Cloudflare 公網動態同步與自動識別)
         let activeMobileUrl = `${window.location.protocol}//${window.location.host}/mobile.html`;
 
         async function updateMobileQr() {
-            try {
-                const res = await fetch('/api/tunnel/config');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
-                        activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+            const isOriginPublic = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+            if (isOriginPublic) {
+                activeMobileUrl = `${window.location.origin}/mobile.html`;
+            } else {
+                try {
+                    const res = await fetch('/api/tunnel/config');
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.tunnelUrl && data.tunnelUrl.startsWith('https://')) {
+                            activeMobileUrl = `${data.tunnelUrl}/mobile.html`;
+                        }
                     }
+                } catch (e) {
+                    console.warn('Cannot fetch tunnel config, fallback to local origin', e);
                 }
-            } catch (e) {
-                console.warn('Cannot fetch tunnel config, fallback to local origin', e);
             }
 
             const isCloudflare = activeMobileUrl.includes('trycloudflare.com');

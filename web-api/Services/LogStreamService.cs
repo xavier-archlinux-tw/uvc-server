@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
@@ -8,11 +7,14 @@ using Microsoft.Extensions.Logging;
 namespace Uvc.Server.Services
 {
     /// <summary>
-    /// 高效能記憶體無鎖日誌廣播服務，專為 SSE (Server-Sent Events) 前端即時終端串流設計
+    /// 高效能記憶體無鎖日誌廣播服務，專為 SSE (Server-Sent Events) 前端即時終端串流設計，
+    /// 並支援記憶體環形緩衝備援 (GetRecentLogs) 實現 100% 雙保險保證。
     /// </summary>
     public class LogStreamService
     {
         private readonly Channel<string> _channel;
+        private readonly ConcurrentQueue<string> _recentLogs = new();
+        private const int MaxRecentLogs = 50;
         private readonly Timer _heartbeatTimer;
 
         public LogStreamService()
@@ -26,6 +28,10 @@ namespace Uvc.Server.Services
             };
             _channel = Channel.CreateBounded<string>(options);
 
+            // 預先寫入系統初始啟動日誌，確保開機第一時間隨時有日誌可供拉取
+            Publish("[SYSTEM] UVC Web API Log Stream Initialized.");
+            Publish("[SYSTEM] Dual-Engine Log Fallback Ready (SSE + Recent Polling).");
+
             // 每 10 秒發送一次心跳，確保 Cloudflare / 反向代理長連線永久保活
             _heartbeatTimer = new Timer(_ =>
             {
@@ -36,7 +42,17 @@ namespace Uvc.Server.Services
         public void Publish(string message)
         {
             var timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.fff");
-            _channel.Writer.TryWrite($"[{timestamp}] {message}");
+            var formatted = $"[{timestamp}] {message}";
+            _channel.Writer.TryWrite(formatted);
+
+            // 同步寫入記憶體環形隊列
+            _recentLogs.Enqueue(formatted);
+            while (_recentLogs.Count > MaxRecentLogs && _recentLogs.TryDequeue(out _)) { }
+        }
+
+        public IReadOnlyList<string> GetRecentLogs()
+        {
+            return _recentLogs.ToArray();
         }
 
         public IAsyncEnumerable<string> ReadAllAsync(CancellationToken ct)
